@@ -1,0 +1,16 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "Secret key used for JWT token signing and verification",
+      "sourceType": "com.ecommerce.backend.config.JwtProperties"
+    },
+    {
+      "name": "jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "JWT token expiration time in milliseconds",
+      "sourceType": "com.ecommerce.backend.config.JwtProperties"
+    }
+  ]
+}

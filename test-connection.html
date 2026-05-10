@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>API Connection Test</title>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    <button onclick="testAPI()">Test API Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:9092/api/products', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <h2>API Connection Test</h2>
+                    <p><strong>Status:</strong> <span style="color: green;">Connected Successfully</span></p>
+                    <p><strong>Response Status:</strong> ${response.status}</p>
+                    <p><strong>Products Found:</strong> ${data.length}</p>
+                    <h3>Sample Product:</h3>
+                    <div style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                        <pre style="white-space: pre-wrap;">${JSON.stringify(data[0], null, 2)}</pre>
+                    </div>
+                    <h3>Debug Info:</h3>
+                    <pre style="background: #e8f5e8; padding: 10px; border-radius: 5px;">
+{
+  "success": true,
+  "endpoint": "http://localhost:9092/api/products",
+  "method": "GET",
+  "status": ${response.status},
+  "productsCount": ${data.length}
+}</pre>
+                `;
+            } catch (error) {
+                console.error('API Test Error:', error);
+                resultDiv.innerHTML = `
+                    <h2>API Connection Test</h2>
+                    <p><strong>Status:</strong> <span style="color: red;">Failed to connect</span></p>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <button onclick="testAPI()" style="margin: 10px 0; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">Test Again</button>
+                    <h3>Debug Info:</h3>
+                    <pre style="background: #ffe8e8; padding: 10px; border-radius: 5px;">
+{
+  "success": false,
+  "error": "${error.message}",
+  "details": "Make sure the backend is running on http://localhost:9092"
+}</pre>
+                    <h3>Troubleshooting Steps:</h3>
+                    <ol style="text-align: left; margin: 20px;">
+                        <li>Check if backend is running: <code>netstat -ano | findstr :9092</code></li>
+                        <li>Test direct API call: <code>curl http://localhost:9092/api/products</code></li>
+                        <li>Check CORS configuration in backend</li>
+                        <li>Verify firewall/antivirus settings</li>
+                    </ol>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP System Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 OTP System Test</h1>
+        <p>Test the new in-memory OTP system that sends OTPs directly to email without database storage.</p>
+
+        <!-- OTP Status Check -->
+        <div class="section">
+            <h3>📊 OTP Service Status</h3>
+            <button onclick="checkOtpStatus()">Check OTP Service Status</button>
+            <div id="statusResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Generate OTP -->
+        <div class="section">
+            <h3>📧 Generate OTP (Login)</h3>
+            <input type="email" id="loginEmail" placeholder="Enter email address" style="width: 250px;">
+            <input type="password" id="loginPassword" placeholder="Enter password" style="width: 200px;">
+            <button onclick="generateOtp()">Generate OTP</button>
+            <div id="generateResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Verify OTP -->
+        <div class="section">
+            <h3>✅ Verify OTP</h3>
+            <input type="email" id="verifyEmail" placeholder="Enter email address" style="width: 250px;">
+            <input type="text" id="otpCode" placeholder="Enter 6-digit OTP" maxlength="6" style="width: 150px;">
+            <button onclick="verifyOtp()">Verify OTP</button>
+            <div id="verifyResult" class="result" style="display: none;"></div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="section">
+            <h3>📋 Instructions</h3>
+            <ol>
+                <li><strong>Check Status:</strong> Click "Check OTP Service Status" to verify the service is running</li>
+                <li><strong>Generate OTP:</strong> Enter valid email and password, then click "Generate OTP"</li>
+                <li><strong>Check Email:</strong> Look for the OTP in your email inbox (check spam folder too)</li>
+                <li><strong>Verify OTP:</strong> Enter the same email and the 6-digit OTP code, then click "Verify OTP"</li>
+            </ol>
+            <p><strong>Note:</strong> If email is not configured, the OTP will be displayed in the server console logs.</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:9092/api/auth';
+
+        async function checkOtpStatus() {
+            const resultDiv = document.getElementById('statusResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Checking status...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${API_BASE}/otp-status`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ OTP Service Status:</strong><br>
+                        Service: ${data.service}<br>
+                        Storage: ${data.storage}<br>
+                        Active OTPs: ${data.activeOtps}<br>
+                        Expiry: ${data.expiryMinutes} minutes<br>
+                        Status: ${data.status}<br>
+                        Message: ${data.message}
+                    `;
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function generateOtp() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const resultDiv = document.getElementById('generateResult');
+            
+            if (!email || !password) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '❌ Please enter both email and password';
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Generating OTP...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
+
+                const data = await response.text();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `✅ ${data}<br><br>📧 Check your email for the OTP code!`;
+                    // Auto-fill the verify email field
+                    document.getElementById('verifyEmail').value = email;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ Error: ${data}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Network Error: ${error.message}`;
+            }
+        }
+
+        async function verifyOtp() {
+            const email = document.getElementById('verifyEmail').value;
+            const otp = document.getElementById('otpCode').value;
+            const resultDiv = document.getElementById('verifyResult');
+            
+            if (!email || !otp) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '❌ Please enter both email and OTP code';
+                return;
+            }
+
+            if (otp.length !== 6) {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = '❌ OTP must be 6 digits';
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Verifying OTP...';
+            resultDiv.className = 'result info';
+
+            try {
+                const response = await fetch(`${API_BASE}/verify-otp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        otp: otp
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        ✅ OTP Verified Successfully!<br><br>
+                        <strong>JWT Token:</strong> ${data.token.substring(0, 50)}...<br>
+                        <strong>User:</strong> ${data.user.name} (${data.user.email})<br>
+                        <strong>Role:</strong> ${data.user.role}
+                    `;
+                    // Clear the OTP field
+                    document.getElementById('otpCode').value = '';
+                } else {
+                    const errorText = typeof data === 'string' ? data : JSON.stringify(data);
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `❌ Error: ${errorText}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Network Error: ${error.message}`;
+            }
+        }
+
+        // Auto-check status on page load
+        window.onload = function() {
+            setTimeout(checkOtpStatus, 1000);
+        };
+    </script>
+</body>
+</html>
