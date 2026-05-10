@@ -20,7 +20,8 @@ public class CorsConfig {
             "http://localhost:3000",
             "http://localhost:3001",
             "null",
-            "https://ecommerce-app-d3mh.onrender.com"
+            "https://ecommerce-app-d3mh.onrender.com",
+            "https://ecommerce-app-alpha-drab.vercel.app"
         ));
         
         // Allow all HTTP methods
