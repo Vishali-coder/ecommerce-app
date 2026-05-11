@@ -1,66 +1,81 @@
 package com.ecommerce.backend.service;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.stereotype.Service;
 
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    @Value("${brevo.api.key:}")
+    private String brevoApiKey;
 
-    @Value("${spring.mail.username:}")
-    private String from;
+    @Value("${brevo.sender.email:vishalir4321@gmail.com}")
+    private String senderEmail;
 
-    @Value("${spring.mail.password:}")
-    private String mailPassword;
+    @Value("${brevo.sender.name:ShopHub}")
+    private String senderName;
+
+    private final RestTemplate restTemplate = new RestTemplate();
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
     public void sendOtpEmail(String to, String otp) {
         System.out.println("🔄 EmailService.sendOtpEmail called for: " + to);
-        System.out.println("📧 From email configured as: " + (from != null && !from.isEmpty() ? from : "NOT SET"));
 
-        if (from == null || from.isEmpty()) {
-            System.out.println("⚠️  spring.mail.username is not configured!");
+        if (brevoApiKey == null || brevoApiKey.isEmpty()) {
+            System.out.println("⚠️ Brevo API key not configured!");
             System.out.println("📧 OTP for " + to + ": " + otp);
             return;
         }
 
-        if (mailPassword == null || mailPassword.isEmpty()) {
-            System.out.println("⚠️  spring.mail.password is not configured!");
-            System.out.println("📧 OTP for " + to + ": " + otp);
-            return;
-        }
-        
         try {
-            // Create HTML email for better presentation
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
-            helper.setFrom(from, "ShopHub Security");
-            helper.setTo(to);
-            helper.setSubject("Your OTP Verification Code - ShopHub");
-            
             String htmlBody = buildOtpEmailBody(otp);
-            helper.setText(htmlBody, true); // Enable HTML
-            
-            mailSender.send(message);
+            sendEmail(to, "Your OTP Verification Code - ShopHub", htmlBody);
             System.out.println("✅ OTP email sent successfully to: " + to);
-            
-        } catch (jakarta.mail.MessagingException e) {
-            System.err.println("❌ Failed to send OTP email to " + to + " (Messaging error): " + e.getMessage());
-            System.out.println("📧 OTP for " + to + ": " + otp);
-        } catch (org.springframework.mail.MailException e) {
-            System.err.println("❌ Failed to send OTP email to " + to + " (Mail service error): " + e.getMessage());
-            System.out.println("📧 OTP for " + to + ": " + otp);
-            // Don't throw exception - allow the process to continue
         } catch (Exception e) {
-            System.err.println("❌ Failed to send OTP email to " + to + " (Unexpected error): " + e.getMessage());
+            System.err.println("❌ Failed to send OTP email to " + to + ": " + e.getMessage());
             System.out.println("📧 OTP for " + to + ": " + otp);
-            // Don't throw exception - allow the process to continue
+        }
+    }
+
+    public void sendOrderConfirmation(String to, String orderId) {
+        if (brevoApiKey == null || brevoApiKey.isEmpty()) {
+            System.out.println("Email not configured. Order confirmation for " + to + " - Order ID: " + orderId);
+            return;
+        }
+
+        try {
+            String body = "<h3>Thank you for your order!</h3>"
+                    + "<p>Your order ID is <b>" + orderId + "</b>.</p>"
+                    + "<p>We'll notify you when it's shipped.</p>";
+            sendEmail(to, "🛒 Order Confirmation - ShopHub", body);
+        } catch (Exception e) {
+            System.err.println("Failed to send order confirmation to " + to + ": " + e.getMessage());
+        }
+    }
+
+    private void sendEmail(String to, String subject, String htmlContent) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("api-key", brevoApiKey);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        Map<String, Object> payload = Map.of(
+            "sender",  Map.of("name", senderName, "email", senderEmail),
+            "to",      List.of(Map.of("email", to)),
+            "subject", subject,
+            "htmlContent", htmlContent
+        );
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(BREVO_API_URL, request, String.class);
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Brevo API error: " + response.getBody());
         }
     }
 
@@ -81,39 +96,4 @@ public class EmailService {
                "</div>" +
                "</div>";
     }
-    public void sendOrderConfirmation(String to, String orderId) {
-        if (from == null || from.isEmpty()) {
-            System.out.println("Email not configured. Order confirmation for " + to + " - Order ID: " + orderId);
-            return;
-        }
-        
-        String subject = "🛒 Order Confirmation - Your order is placed!";
-        String body = "<h3>Thank you for your order!</h3>"
-                    + "<p>Your order ID is <b>" + orderId + "</b>.</p>"
-                    + "<p>We'll notify you when it's shipped.</p>";
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true);
-            helper.setFrom(from);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(body, true); // enable HTML
-            mailSender.send(message);
-        } catch (jakarta.mail.MessagingException e) {
-            System.err.println("Failed to send order confirmation email to " + to + " (Messaging error): " + e.getMessage());
-            System.out.println("Order confirmation for " + to + " - Order ID: " + orderId);
-            // Don't throw exception - allow the order to be placed successfully even if email fails
-        } catch (org.springframework.mail.MailException e) {
-            System.err.println("Failed to send order confirmation email to " + to + " (Mail service error): " + e.getMessage());
-            System.out.println("Order confirmation for " + to + " - Order ID: " + orderId);
-            // Don't throw exception - allow the order to be placed successfully even if email fails
-        } catch (Exception e) {
-            System.err.println("Failed to send order confirmation email to " + to + " (Unexpected error): " + e.getMessage());
-            System.out.println("Order confirmation for " + to + " - Order ID: " + orderId);
-            // Don't throw exception - allow the order to be placed successfully even if email fails
-        }
-    }
 }
-
-
